@@ -567,9 +567,6 @@ static int genl_validate_ops(const struct genl_family *family)
 		if (!(i.flags & (GENL_CMD_CAP_DO | GENL_CMD_CAP_DUMP)))
 			return -EINVAL;
 
-		if (WARN_ON(i.cmd >= family->resv_start_op &&
-			    (i.doit.validate || i.dumpit.validate)))
-			return -EINVAL;
 
 		genl_op_iter_copy(&j, &i);
 		while (genl_op_iter_next(&j)) {
