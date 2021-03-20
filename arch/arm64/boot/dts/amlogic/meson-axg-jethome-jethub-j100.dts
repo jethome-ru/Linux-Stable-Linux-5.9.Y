@@ -352,3 +352,8 @@
 	key = <&efusekey>;
 	clock-names = "efuse_clk";
 };
+
+&gpio_intc {
+	compatible ="amlogic,meson-gpio-intc", "amlogic,meson-axg-gpio-intc";
+	status = "okay";
+};

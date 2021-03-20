@@ -321,6 +321,9 @@
 					      <0x0 0x00430 0x0 0x3c>;
 					reg-names = "mux", "pull", "pull-enable", "gpio";
 					gpio-controller;
+					interrupt-parent = <&gpio_intc>;
+					interrupt-controller;
+					#interrupt-cells = <2>;
 					#gpio-cells = <2>;
 					gpio-ranges = <&pinctrl_periphs 0 0 86>;
 				};
@@ -1683,7 +1686,7 @@
 
 			gpio_intc: interrupt-controller@f080 {
 				compatible = "amlogic,meson-axg-gpio-intc",
-					     "amlogic,meson-gpio-intc";
+						"amlogic,meson-gpio-intc";
 				reg = <0x0 0xf080 0x0 0x10>;
 				interrupt-controller;
 				#interrupt-cells = <2>;
