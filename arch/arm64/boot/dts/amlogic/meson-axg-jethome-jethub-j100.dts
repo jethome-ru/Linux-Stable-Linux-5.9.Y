@@ -13,6 +13,7 @@
 		serial0 = &uart_AO;   /* Console */
 		serial1 = &uart_B;    /* Bluetooth */
 		serial2 = &uart_AO_B; /* External UART (Wireless Module) */
+		ethernet0 = &ethmac;
 	};
 
 	chosen {
