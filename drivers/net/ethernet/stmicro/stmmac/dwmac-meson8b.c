@@ -280,6 +280,13 @@ static int meson8b_init_led_eth(struct meson8b_dwmac *dwmac, void __iomem *regCN
 	dwmac->regs = regCNTL;
 	printk("dwmac: init_led: exec mask_bits: %X %X reg:0x%X offset:0x%X",mask, leds, regCNTL, ETH_PHY_CNTL1);
 	meson8b_dwmac_mask_bits(dwmac, ETH_PHY_CNTL1, mask << 24, leds << 24);
+
+	/* reset procedure from 4.9 kernel */
+	meson8b_dwmac_mask_bits(dwmac, ETH_PHY_CNTL1, 0x1 << 18, 0);
+	mdelay(10);
+	meson8b_dwmac_mask_bits(dwmac, ETH_PHY_CNTL1, 0x1 << 18, 0x1<<18);
+	mdelay(10);
+
 	dwmac->regs = backup;
 	return 0;
 
