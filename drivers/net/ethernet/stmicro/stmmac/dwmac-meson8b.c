@@ -21,9 +21,20 @@
 
 #include "stmmac_platform.h"
 
+
+#ifdef CONFIG_AMLOGIC_ETH_PRIVE
+static void __iomem		*ETH_REG_CNTL;
+static int				ETH_PLL;
+u32						ETH_LEDS;
+#endif
+
 #define PRG_ETH0			0x0
 
-#define ETH_PHY_CNTL1 0x0
+#ifdef CONFIG_AMLOGIC_ETH_PRIVE
+#define ETH_PHY_CNTL1		0x84
+#define ETH_PHY_DBG_CTL1	0x4
+#define LED_POLARITY 		1<<23
+#endif
 
 #define PRG_ETH0_RGMII_MODE		BIT(0)
 
@@ -107,7 +118,6 @@ static void meson8b_dwmac_mask_bits(struct meson8b_dwmac *dwmac, u32 reg,
 	data |= (value & mask);
 
 	writel(data, dwmac->regs + reg);
-	printk("dwmac: mask_bits: value:0x%X mask:0x%X data:0x%X old data:0x%X",value, mask, data, data2);
 }
 
 static struct clk *meson8b_dwmac_register_clk(struct meson8b_dwmac *dwmac,
@@ -272,25 +282,48 @@ static int meson8b_devm_clk_prepare_enable(struct meson8b_dwmac *dwmac,
 
 	return 0;
 }
-static int meson8b_init_led_eth(struct meson8b_dwmac *dwmac, void __iomem *regCNTL, u32 leds)
+
+#ifdef CONFIG_AMLOGIC_ETH_PRIVE
+
+static void meson8b_reg_mask_bits(void __iomem *basereg, u32 reg,
+				    u32 mask, u32 value)
 {
-	void __iomem *backup;
-	u32 mask=0xFF;
-	backup = dwmac->regs;
-	dwmac->regs = regCNTL;
-	printk("dwmac: init_led: exec mask_bits: %X %X reg:0x%X offset:0x%X",mask, leds, regCNTL, ETH_PHY_CNTL1);
-	meson8b_dwmac_mask_bits(dwmac, ETH_PHY_CNTL1, mask << 24, leds << 24);
+	u32 data;
+	u32 data2;
+	u32 datatest;
 
-	/* reset procedure from 4.9 kernel */
-	meson8b_dwmac_mask_bits(dwmac, ETH_PHY_CNTL1, 0x1 << 18, 0);
-	mdelay(10);
-	meson8b_dwmac_mask_bits(dwmac, ETH_PHY_CNTL1, 0x1 << 18, 0x1<<18);
-	mdelay(10);
+	data = readl(basereg + reg);
+	data2 = data;
+	data &= ~mask;
+	data |= (value & mask);
 
-	dwmac->regs = backup;
-	return 0;
-
+	writel(data, basereg + reg);
+	datatest = readl(basereg + reg);
+	printk("dwmac: mask_bits: value:0x%X mask:0x%X data:0x%X old data:0x%X checkdata:0x%X in reg:%x",
+			value, mask, data, data2, datatest, basereg + reg);
 }
+
+static int meson8b_init_led_eth(void __iomem *regCNTL, u32 pll, u32 leds)
+{
+	printk("dwmac: set led polarity: exec mask_bits: 0x%X 0x%X reg:0x%08X offset:0x%08X", LED_POLARITY, LED_POLARITY, regCNTL, ETH_PHY_DBG_CTL1);
+	meson8b_reg_mask_bits(regCNTL, ETH_PHY_DBG_CTL1, LED_POLARITY, LED_POLARITY);
+	
+	if (pll) {
+		u32 mask=0xFF;
+		meson8b_reg_mask_bits(regCNTL, ETH_PHY_CNTL1, mask << 24, leds << 24);
+		printk("dwmac: set led bits: exec mask_bits: %X %X reg:0x%8X offset:0x%8X", mask, leds, regCNTL, ETH_PHY_CNTL1);
+		/* reset procedure from 4.9 kernel */
+		meson8b_reg_mask_bits(regCNTL, ETH_PHY_CNTL1, 0x1 << 18, 0);
+		printk("dwmac: set reset bits: exec mask_bits: %X %X reg:0x%8X offset:0x%8X", 0x1<<18, 0, regCNTL, ETH_PHY_CNTL1);
+		mdelay(10);
+		meson8b_reg_mask_bits(regCNTL, ETH_PHY_CNTL1, 0x1 << 18, 0x1<<18);
+		printk("dwmac: set reset bits: exec mask_bits: %X %X reg:0x%8X offset:0x%8X", 0x1<<18, 0x1<<18, regCNTL, ETH_PHY_CNTL1);
+		mdelay(10);
+	}
+	return 0;
+}
+#endif
+
 static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
 {
 	u32 tx_dly_config, rx_dly_config, delay_config;
@@ -389,8 +422,9 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
 	struct plat_stmmacenet_data *plat_dat;
 	struct stmmac_resources stmmac_res;
 	struct meson8b_dwmac *dwmac;
-	void __iomem	*regCNTL;
-	u32	eth_leds;
+#ifdef CONFIG_AMLOGIC_ETH_PRIVE
+	u32 internal_phy;
+#endif
 
 	int ret;
 
@@ -463,8 +497,18 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_remove_config_dt;
 
-	/* backport from 4.9 amlogic kernel for led setup */
-	/* ETH_PHY_CNTL1 for internal phy amlogic devices
+	plat_dat->bsp_priv = dwmac;
+
+#ifdef CONFIG_AMLOGIC_ETH_PRIVE
+	/* backport from 4.9 amlogic kernel for led setup
+	 * pre control from dts resource:
+		internal_phy = <1> can't control led if not defined
+		Ethernet PHY register:
+		eth_pll in reg names: if defined = full led control, if not - only reverse bit can setup
+		third value in reg map - control register PLL (if not defined eth_pll)
+	 * BIT(23) register ETH_PHY_DBG_CTL1 (0x4) set reverse leds
+	 * or
+	 * ETH_PHY_CNTL1 (0x84) for full led control
 	    bits 31:24
 	      bits 7:5 (31:29)
 	        000 - link_led & (~activity)
@@ -489,28 +533,66 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
 	      bit 0
 	        invert all led signal from phy
 	*/
-	if (!of_property_read_u32(pdev->dev.of_node, "amlogic,eth-leds",
-		 &eth_leds))
-	{
-		eth_leds = eth_leds & 0xFF;
-		regCNTL  = devm_platform_ioremap_resource(pdev, 2);
-		if (!IS_ERR(regCNTL)) {
-			printk("dwmac: led set reg: %X value %X",regCNTL, eth_leds);
-			ret = meson8b_init_led_eth(dwmac, regCNTL, eth_leds);
-			if (ret)
-				dev_info(&pdev->dev, "Something wrong with led setup\n");
-			else
-				dev_info(&pdev->dev, "LED setting supported\n");
+
+	if (!of_property_read_u32(pdev->dev.of_node, "internal_phy", &internal_phy)) {
+		ETH_PLL = 1;
+		ETH_REG_CNTL  = devm_platform_ioremap_resource_byname(pdev, "eth_pll");
+		if (IS_ERR(ETH_REG_CNTL)) {
+			ETH_PLL = 0;
+			ETH_REG_CNTL  = devm_platform_ioremap_resource(pdev, 2);
 		}
+
+#define ETH_REG2_REVERSED BIT(28)
+#define INTERNAL_PHY_ID 0x110181
+#define PHY_ENABLE  BIT(31)
+#define USE_PHY_IP  BIT(30)
+#define CLK_IN_EN   BIT(29)
+#define USE_PHY_MDI BIT(26)
+#define LED_POLARITY  BIT(23)
+#define ETH_REG3_19_RESVERD (0x9 << 16)
+#define CFG_PHY_ADDR (0x8 << 8)
+#define CFG_MODE (0x7 << 4)
+#define CFG_EN_HIGH BIT(3)
+#define ETH_REG3_2_RESERVED 0x7
+		if (!IS_ERR(ETH_REG_CNTL)) {
+			u32 odata, odata2, data, data2;
+			odata = readl(ETH_REG_CNTL);
+			odata2 = readl(ETH_REG_CNTL + 4);
+			writel(ETH_REG2_REVERSED | INTERNAL_PHY_ID,
+			       ETH_REG_CNTL);
+			writel(PHY_ENABLE | USE_PHY_IP | CLK_IN_EN |
+					USE_PHY_MDI | LED_POLARITY |
+					ETH_REG3_19_RESVERD	| CFG_PHY_ADDR |
+					CFG_MODE | CFG_EN_HIGH |
+					ETH_REG3_2_RESERVED, ETH_REG_CNTL + 4);
+			data = readl(ETH_REG_CNTL);
+			data2 = readl(ETH_REG_CNTL + 4);
+			printk("dwmac: !! odata:0x%X odata2:0x%X data:0x%X data2:0x%X", odata, odata2, data, data2);
+
+#if 0
+			if (!of_property_read_u32(pdev->dev.of_node, "amlogic,eth-leds",
+			 	&ETH_LEDS))
+			{
+				ETH_LEDS = ETH_LEDS & 0xFF;
+			}
+			printk("dwmac: before led set reg:%X value:%X pll:%X",ETH_REG_CNTL, ETH_LEDS, ETH_PLL);
+			ret = meson8b_init_led_eth(ETH_REG_CNTL, ETH_PLL, ETH_LEDS);
+			if (ret)
+				dev_info(&pdev->dev, "ETH phy led setup error\n");
+			else
+				dev_info(&pdev->dev, "ETH phy led %s setup supported\n", ETH_PLL?"full":"only polarity");
+#endif
+		}
+	} else
+	{
+		dev_info(&pdev->dev, "LED setting not supported on external_phy\n");
 	}
 	/* end led setup */
-
-	plat_dat->bsp_priv = dwmac;
+#endif
 
 	ret = stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
 	if (ret)
 		goto err_remove_config_dt;
-
 	return 0;
 
 err_remove_config_dt:

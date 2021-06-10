@@ -281,6 +281,7 @@
 		0x0 0xc1104408 0x0 0x4>;
 	amlogic,eth-leds = <0x91>;
 	status = "okay";
+	internal_phy = <1>;
 	phy-mode = "rmii";
 	phy-handle = <&internal_phy>;
 };
