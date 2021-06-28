@@ -274,7 +274,7 @@ static const struct ieee80211_regdomain world_regdom = {
 static const struct ieee80211_regdomain *cfg80211_world_regdom =
 	&world_regdom;
 
-static char *ieee80211_regdom = "00";
+static char *ieee80211_regdom = "AU";
 static char user_alpha2[2];
 static const struct ieee80211_regdomain *cfg80211_user_regdom;
 

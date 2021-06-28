@@ -7441,6 +7441,16 @@ int brcmf_cfg80211_wait_vif_event(struct brcmf_cfg80211_info *cfg,
 				  vif_event_equals(event, action), timeout);
 }
 
+// jethub: allow country_codes
+// TODO: move country codes to device specific platform data
+static int is_au_or_cn_or_ru_or_us(char alpha2[2])
+{
+	return (alpha2[0] == 'A' && alpha2[1] == 'U') ||
+	       (alpha2[0] == 'C' && alpha2[1] == 'N') ||
+	       (alpha2[0] == 'R' && alpha2[1] == 'U') ||
+	       (alpha2[0] == 'U' && alpha2[1] == 'S');
+}
+
 static s32 brcmf_translate_country_code(struct brcmf_pub *drvr, char alpha2[2],
 					struct brcmf_fil_country_le *ccreq)
 {
@@ -7448,9 +7458,10 @@ static s32 brcmf_translate_country_code(struct brcmf_pub *drvr, char alpha2[2],
 	struct brcmfmac_pd_cc_entry *cc;
 	s32 found_index;
 	int i;
+	char ccode_tmp[BRCMF_COUNTRY_BUF_SZ] = {0};
 
 	country_codes = drvr->settings->country_codes;
-	if (!country_codes) {
+	if (!country_codes && !is_au_or_cn_or_ru_or_us(alpha2)) {
 		brcmf_dbg(TRACE, "No country codes configured for device\n");
 		return -EINVAL;
 	}
@@ -7461,25 +7472,42 @@ static s32 brcmf_translate_country_code(struct brcmf_pub *drvr, char alpha2[2],
 		return -EAGAIN;
 	}
 
-	found_index = -1;
-	for (i = 0; i < country_codes->table_size; i++) {
-		cc = &country_codes->table[i];
-		if ((cc->iso3166[0] == '\0') && (found_index == -1))
-			found_index = i;
-		if ((cc->iso3166[0] == alpha2[0]) &&
-		    (cc->iso3166[1] == alpha2[1])) {
-			found_index = i;
-			break;
+        if (!is_au_or_cn_or_ru_or_us(alpha2)) {
+		found_index = -1;
+		for (i = 0; i < country_codes->table_size; i++) {
+			cc = &country_codes->table[i];
+			if ((cc->iso3166[0] == '\0') && (found_index == -1))
+				found_index = i;
+			if ((cc->iso3166[0] == alpha2[0]) &&
+			    (cc->iso3166[1] == alpha2[1])) {
+				found_index = i;
+				break;
+			}
+		}
+		if (found_index == -1) {
+			brcmf_dbg(TRACE, "No country code match found\n");
+			return -EINVAL;
 		}
 	}
-	if (found_index == -1) {
-		brcmf_dbg(TRACE, "No country code match found\n");
-		return -EINVAL;
-	}
 	memset(ccreq, 0, sizeof(*ccreq));
-	ccreq->rev = cpu_to_le32(country_codes->table[found_index].rev);
-	memcpy(ccreq->ccode, country_codes->table[found_index].cc,
-	       BRCMF_COUNTRY_BUF_SZ);
+
+	if (is_au_or_cn_or_ru_or_us(alpha2)) {
+		ccreq->rev = (alpha2[0] == 'A' && alpha2[1] == 'U'
+			      ? cpu_to_le32(6)                             // 6 - from dhd config
+			      : (alpha2[0] == 'C' && alpha2[1] == 'N'
+				 ? cpu_to_le32(38)                         // 38 - from dhd config
+				 : (alpha2[0] == 'U' && alpha2[1] == 'S'
+				   ? cpu_to_le32(0)                        // 0 - default value from iovar 'country'
+				   : cpu_to_le32(-1))));                   // -1 - unspecified rev
+
+		ccode_tmp[0] = alpha2[0];
+		ccode_tmp[1] = alpha2[1];
+                memcpy(ccreq->ccode, ccode_tmp, BRCMF_COUNTRY_BUF_SZ);
+	} else {
+		ccreq->rev = cpu_to_le32(country_codes->table[found_index].rev);
+	        memcpy(ccreq->ccode, country_codes->table[found_index].cc, BRCMF_COUNTRY_BUF_SZ);
+
+	}
 	ccreq->country_abbrev[0] = alpha2[0];
 	ccreq->country_abbrev[1] = alpha2[1];
 	ccreq->country_abbrev[2] = 0;
