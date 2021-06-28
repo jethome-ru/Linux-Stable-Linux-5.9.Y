@@ -2919,6 +2919,8 @@ brcmf_cfg80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *ndev,
 	struct brcmf_pub *drvr = cfg->pub;
 
 	brcmf_dbg(TRACE, "Enter\n");
+	// jethub j100: force disable Powersave (for wifi connection stability)
+	enabled = 0;
 
 	/*
 	 * Powersave enable/disable request is coming from the
@@ -2957,7 +2959,9 @@ brcmf_cfg80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *ndev,
 
 done:
 	brcmf_dbg(TRACE, "Exit\n");
-	return err;
+	// return err;
+	// jethub j100: tell the system that the operation is not supported
+	return -EOPNOTSUPP;
 }
 
 static s32 brcmf_inform_single_bss(struct brcmf_cfg80211_info *cfg,
