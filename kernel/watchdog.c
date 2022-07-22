@@ -51,7 +51,9 @@ int __read_mostly watchdog_thresh = 10;
 #endif
 static int __read_mostly nmi_watchdog_available;
 
+#ifdef CONFIG_SOFTLOCKUP_DETECTOR
 static struct cpumask watchdog_allowed_mask __read_mostly;
+#endif
 
 struct cpumask watchdog_cpumask __read_mostly;
 unsigned long *watchdog_cpumask_bits = cpumask_bits(&watchdog_cpumask);
