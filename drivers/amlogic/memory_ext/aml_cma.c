@@ -453,8 +453,14 @@ int cma_alloc_contig_boost(unsigned long start_pfn, unsigned long count)
 	unsigned long cnt;
 	unsigned long flags;
 	struct cma_pcp *work;
-	struct work_cma job[NR_CPUS] = {};
+	struct work_cma *job;
 
+	// NR_CPUS
+	job = kmalloc_array(num_possible_cpus(), sizeof(*job), GFP_KERNEL);
+	if (!job)
+		return -EINVAL;
+
+	pr_err(" alloc\n");
 	cpumask_clear(&has_work);
 
 	cpus  = num_online_cpus();
@@ -501,6 +507,8 @@ int cma_alloc_contig_boost(unsigned long start_pfn, unsigned long count)
 		pr_err("%s, failed, ret:%d, ok:%d\n",
 		       __func__, ret, atomic_read(&ok));
 	}
+
+	kfree(job);
 
 	return ret;
 }
