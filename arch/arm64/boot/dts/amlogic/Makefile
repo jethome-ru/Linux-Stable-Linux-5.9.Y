@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
+dtb-y += meson-axg-jethome-jethub-j110.dtb
+dtb-y += meson-axg-jethome-jethub-j100.dtb
 dtb-y += sm1_s905x3_ac213.dtb
 dtb-y += sm1_s905x3_ac214.dtb
 dtb-y += meson-a1-ad401.dtb

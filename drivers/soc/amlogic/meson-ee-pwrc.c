@@ -20,6 +20,7 @@
 #include <dt-bindings/power/meson-g12a-power.h>
 #include <dt-bindings/power/meson-sm1-power.h>
 #include <dt-bindings/power/meson-tm2-power.h>
+#include <dt-bindings/power/meson-axg-power.h>
 
 /* AO Offsets */
 
@@ -238,6 +239,11 @@ static struct meson_ee_pwrc_mem_domain sm1_pwrc_mem_hevc[] = {
 
 static struct meson_ee_pwrc_mem_domain sm1_pwrc_mem_wave420l[] = {
 	{ DOS_MEM_PD_WAVE420L, GENMASK(31, 0) },
+};
+
+static struct meson_ee_pwrc_mem_domain axg_pwrc_mem_vpu[] = {
+	VPU_MEMPD(HHI_VPU_MEM_PD_REG0),
+	VPU_HHI_MEMPD(HHI_MEM_PD_REG0),
 };
 
 static struct meson_ee_pwrc_mem_domain tm2_pwrc_mem_vpu[] = {
@@ -821,6 +827,10 @@ static const struct of_device_id meson_ee_pwrc_match_table[] = {
 		.compatible = "amlogic,meson-tm2-pwrc",
 		.data = &meson_ee_tm2_pwrc_data,
 	},
+	{
+		.compatible = "amlogic,meson-axg-pwrc",
+		.data = &meson_ee_axg_pwrc_data,
+	},
 	{ /* sentinel */ }
 };
 
@@ -834,3 +844,19 @@ static struct platform_driver meson_ee_pwrc_driver = {
 };
 builtin_platform_driver(meson_ee_pwrc_driver);
 MODULE_LICENSE("GPL v2");
+
+static struct meson_ee_pwrc_mem_domain axg_pwrc_mem_audio[] = {
+	{ HHI_MEM_PD_REG0, GENMASK(5, 4) },
+};
+
+static struct meson_ee_pwrc_domain_desc axg_pwrc_domains[] = {
+	[PWRC_AXG_VPU_ID]  = VPU_PD("VPU", &gx_pwrc_vpu, axg_pwrc_mem_vpu,
+				     pwrc_ee_is_powered_off, 5, 2),
+	[PWRC_AXG_ETHERNET_MEM_ID] = MEM_PD("ETH", meson_pwrc_mem_eth),
+	[PWRC_AXG_AUDIO_ID] = MEM_PD("AUDIO", axg_pwrc_mem_audio),
+};
+
+static struct meson_ee_pwrc_domain_data meson_ee_axg_pwrc_data = {
+	.count = ARRAY_SIZE(axg_pwrc_domains),
+	.domains = axg_pwrc_domains,
+};
