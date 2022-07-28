@@ -33,6 +33,7 @@
 #include <linux/amlogic/iomap.h>
 #include <linux/io.h>
 #include <linux/amlogic/bt_device.h>
+#include <linux/amlogic/pm.h>
 #include <linux/amlogic/wifi_dt.h>
 #include <linux/random.h>
 #ifdef CONFIG_AM_WIFI_SD_MMC
