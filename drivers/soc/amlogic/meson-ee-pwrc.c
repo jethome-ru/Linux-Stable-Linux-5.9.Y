@@ -85,6 +85,12 @@ struct meson_ee_pwrc_domain_data {
 };
 
 /* TOP Power Domains */
+static struct meson_ee_pwrc_top_domain gx_pwrc_vpu = {
+	.sleep_reg = AO_RTI_GEN_PWR_SLEEP0,
+	.sleep_mask = BIT(8),
+	.iso_reg = AO_RTI_GEN_PWR_SLEEP0,
+	.iso_mask = BIT(9),
+};
 
 static struct meson_ee_pwrc_top_domain g12a_pwrc_vpu = {
 	.sleep_reg = AO_RTI_GEN_PWR_SLEEP0,
@@ -329,6 +335,14 @@ static struct meson_ee_pwrc_mem_domain tm2_pwrc_mem_atvdemod[] = {
 	{ HHI_MEM_PD_REG1, GENMASK(5, 4) },
 };
 
+static struct meson_ee_pwrc_mem_domain axg_pwrc_mem_audio[] = {
+	{ HHI_MEM_PD_REG0, GENMASK(5, 4) },
+};
+
+static struct meson_ee_pwrc_mem_domain meson_pwrc_mem_eth[] = {
+	{ HHI_MEM_PD_REG0, GENMASK(3, 2) },
+};
+
 #define VPU_PD(__name, __top_pd, __mem, __get_power, __resets,		\
 		__clks, __dom_id)					\
 	{								\
@@ -359,6 +373,16 @@ static struct meson_ee_pwrc_mem_domain tm2_pwrc_mem_atvdemod[] = {
 	TOP_PD(__name, NULL, __mem, NULL, 0, __dom_id, __flag)
 
 static bool pwrc_ee_get_power(struct meson_ee_pwrc_domain *pwrc_domain);
+
+static struct meson_ee_pwrc_domain_desc axg_pwrc_domains[] = {
+	[PWRC_AXG_VPU_ID]  = VPU_PD("VPU", &gx_pwrc_vpu, axg_pwrc_mem_vpu,
+				     pwrc_ee_get_power, 5, 2,
+				     PWRC_AXG_VPU_ID),
+	[PWRC_AXG_ETHERNET_MEM_ID] = MEM_PD("ETH", meson_pwrc_mem_eth,
+					    PWRC_AXG_ETHERNET_MEM_ID, 0),
+	[PWRC_AXG_AUDIO_ID] = MEM_PD("AUDIO", axg_pwrc_mem_audio,
+				     PWRC_AXG_AUDIO_ID, 0),
+};
 
 static struct meson_ee_pwrc_domain_desc g12a_pwrc_domains[] = {
 	[PWRC_G12A_VPU_ID]  = VPU_PD("VPU", &g12a_pwrc_vpu, g12a_pwrc_mem_vpu,
@@ -804,6 +828,11 @@ static struct meson_ee_pwrc_domain_data meson_ee_g12a_pwrc_data = {
 	.domains = g12a_pwrc_domains,
 };
 
+static struct meson_ee_pwrc_domain_data meson_ee_axg_pwrc_data = {
+	.count = ARRAY_SIZE(axg_pwrc_domains),
+	.domains = axg_pwrc_domains,
+};
+
 static struct meson_ee_pwrc_domain_data meson_ee_sm1_pwrc_data = {
 	.count = ARRAY_SIZE(sm1_pwrc_domains),
 	.domains = sm1_pwrc_domains,
@@ -845,18 +874,3 @@ static struct platform_driver meson_ee_pwrc_driver = {
 builtin_platform_driver(meson_ee_pwrc_driver);
 MODULE_LICENSE("GPL v2");
 
-static struct meson_ee_pwrc_mem_domain axg_pwrc_mem_audio[] = {
-	{ HHI_MEM_PD_REG0, GENMASK(5, 4) },
-};
-
-static struct meson_ee_pwrc_domain_desc axg_pwrc_domains[] = {
-	[PWRC_AXG_VPU_ID]  = VPU_PD("VPU", &gx_pwrc_vpu, axg_pwrc_mem_vpu,
-				     pwrc_ee_is_powered_off, 5, 2),
-	[PWRC_AXG_ETHERNET_MEM_ID] = MEM_PD("ETH", meson_pwrc_mem_eth),
-	[PWRC_AXG_AUDIO_ID] = MEM_PD("AUDIO", axg_pwrc_mem_audio),
-};
-
-static struct meson_ee_pwrc_domain_data meson_ee_axg_pwrc_data = {
-	.count = ARRAY_SIZE(axg_pwrc_domains),
-	.domains = axg_pwrc_domains,
-};
