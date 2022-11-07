@@ -2482,24 +2482,19 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err,
 		flags |= NLM_F_ACK_TLVS;
 
 	skb = nlmsg_new(payload + tlvlen, GFP_KERNEL);
-	if (!skb)
-		goto err_skb;
+	if (!skb) {
+		NETLINK_CB(in_skb).sk->sk_err = ENOBUFS;
+		sk_error_report(NETLINK_CB(in_skb).sk);
+		return;
+	}
 
 	rep = nlmsg_put(skb, NETLINK_CB(in_skb).portid, nlh->nlmsg_seq,
-			NLMSG_ERROR, sizeof(*errmsg), flags);
-	if (!rep)
-		goto err_bad_put;
+			NLMSG_ERROR, payload, flags);
 	errmsg = nlmsg_data(rep);
 	errmsg->error = err;
-	errmsg->msg = *nlh;
-
-	if (!(flags & NLM_F_CAPPED)) {
-		if (!nlmsg_append(skb, nlmsg_len(nlh)))
-			goto err_bad_put;
-
-		memcpy(nlmsg_data(&errmsg->msg), nlmsg_data(nlh),
-		       nlmsg_len(nlh));
-	}
+	unsafe_memcpy(&errmsg->msg, nlh, payload > sizeof(*errmsg)
+					 ? nlh->nlmsg_len : sizeof(*nlh),
+		      /* Bounds checked by the skb layer. */);
 
 	if (tlvlen)
 		netlink_ack_tlv_fill(in_skb, skb, nlh, err, extack);
@@ -2507,14 +2502,6 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err,
 	nlmsg_end(skb, rep);
 
 	nlmsg_unicast(in_skb->sk, skb, NETLINK_CB(in_skb).portid);
-
-	return;
-
-err_bad_put:
-	nlmsg_free(skb);
-err_skb:
-	NETLINK_CB(in_skb).sk->sk_err = ENOBUFS;
-	sk_error_report(NETLINK_CB(in_skb).sk);
 }
 EXPORT_SYMBOL(netlink_ack);
 
