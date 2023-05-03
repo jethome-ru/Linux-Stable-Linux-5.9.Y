@@ -20,6 +20,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/regmap.h>
 #include <linux/stmmac.h>
+#include <linux/gpio/consumer.h>
 
 #include "stmmac.h"
 #include "stmmac_platform.h"
@@ -76,6 +77,7 @@ struct sunxi_priv_data {
 	bool internal_phy_powered;
 	bool use_internal_phy;
 	void *mux_handle;
+	struct gpio_desc *reset_gpio;
 };
 
 /* EMAC clock register @ 0x30 in the "system control" address range */
@@ -1269,6 +1271,27 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
 			goto dwmac_mux;
 		}
 	} else {
+		gmac->ephy_clk = devm_clk_get(dev, "phy");
+		if (IS_ERR(gmac->ephy_clk)) {
+			dev_info(dev, "No PHY clk found\n");
+		} else {
+			ret = clk_prepare_enable(gmac->ephy_clk);
+			if (ret)
+				dev_err(dev, "Cannot enable PHY clk\n");
+			else
+				dev_info(dev, "Enable PHY clk\n");
+		}
+
+		gmac->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
+		if (IS_ERR(gmac->reset_gpio)) {
+			dev_info(dev, "No reset-gpios found\n");
+		} else {
+			dev_info(dev, "Reset ext PHY\n");
+			gpiod_set_value_cansleep(gmac->reset_gpio, 1);
+			msleep(20);
+			gpiod_set_value_cansleep(gmac->reset_gpio, 0);
+		}
+
 		ret = sun8i_dwmac_reset(priv);
 		if (ret)
 			goto dwmac_remove;
@@ -1282,6 +1305,8 @@ dwmac_mux:
 	reset_control_put(gmac->rst_ephy);
 	clk_put(gmac->ephy_clk);
 dwmac_remove:
+	if (!gmac->variant->soc_has_internal_phy)
+		clk_disable_unprepare(gmac->ephy_clk);
 	pm_runtime_put_noidle(&pdev->dev);
 	stmmac_dvr_remove(&pdev->dev);
 dwmac_exit:
@@ -1305,6 +1330,8 @@ static void sun8i_dwmac_remove(struct platform_device *pdev)
 		sun8i_dwmac_unpower_internal_phy(gmac);
 		reset_control_put(gmac->rst_ephy);
 		clk_put(gmac->ephy_clk);
+	} else {
+		clk_disable_unprepare(gmac->ephy_clk);
 	}
 
 	stmmac_pltfr_remove(pdev);
