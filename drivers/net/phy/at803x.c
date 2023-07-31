@@ -83,6 +83,7 @@
 #define AT803X_LOC_MAC_ADDR_32_47_OFFSET	0x804A
 #define AT803X_REG_CHIP_CONFIG			0x1f
 #define AT803X_BT_BX_REG_SEL			0x8000
+#define AT803X_SGMII_ANEG_EN			0x1000
 
 #define AT803X_DEBUG_ADDR			0x1D
 #define AT803X_DEBUG_DATA			0x1E
@@ -955,6 +956,27 @@ static int at803x_smarteee_config(struct phy_device *phydev)
 	struct at803x_priv *priv = phydev->priv;
 	u16 mask = 0, val = 0;
 	int ret;
+	u32 v;
+
+	if (phydev->drv->phy_id == ATH8031_PHY_ID &&
+		phydev->interface == PHY_INTERFACE_MODE_SGMII)
+	{
+		v = phy_read(phydev, AT803X_REG_CHIP_CONFIG);
+		/* select SGMII/fiber page */
+		ret = phy_write(phydev, AT803X_REG_CHIP_CONFIG,
+						v & ~AT803X_BT_BX_REG_SEL);
+		if (ret)
+			return ret;
+		/* enable SGMII autonegotiation */
+		ret = phy_write(phydev, MII_BMCR, AT803X_SGMII_ANEG_EN);
+		if (ret)
+			return ret;
+		/* select copper page */
+		ret = phy_write(phydev, AT803X_REG_CHIP_CONFIG,
+						v | AT803X_BT_BX_REG_SEL);
+		if (ret)
+			return ret;
+	}
 
 	if (priv->flags & AT803X_DISABLE_SMARTEEE)
 		return phy_modify_mmd(phydev, MDIO_MMD_PCS,
