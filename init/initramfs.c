@@ -121,17 +121,15 @@ static void __init free_hash(void)
 	}
 }
 
-#ifdef CONFIG_INITRAMFS_PRESERVE_MTIME
-static void __init do_utime(char *filename, time64_t mtime)
+static long __init do_utime(char *filename, time64_t mtime)
 {
-	struct timespec64 t[2] = { { .tv_sec = mtime }, { .tv_sec = mtime } };
-	init_utimes(filename, t);
-}
+	struct timespec64 t[2];
 
-static void __init do_utime_path(const struct path *path, time64_t mtime)
-{
-	struct timespec64 t[2] = { { .tv_sec = mtime }, { .tv_sec = mtime } };
-	vfs_utimes(path, t);
+	t[0].tv_sec = mtime;
+	t[0].tv_nsec = 0;
+	t[1].tv_sec = mtime;
+	t[1].tv_nsec = 0;
+	return init_utimes(filename, t);
 }
 
 static __initdata LIST_HEAD(dir_list);
@@ -164,12 +162,6 @@ static void __init dir_utime(void)
 		kfree(de);
 	}
 }
-#else
-static void __init do_utime(char *filename, time64_t mtime) {}
-static void __init do_utime_path(const struct path *path, time64_t mtime) {}
-static void __init dir_add(const char *name, time64_t mtime) {}
-static void __init dir_utime(void) {}
-#endif
 
 static __initdata time64_t mtime;
 
@@ -401,10 +393,14 @@ static int __init do_name(void)
 static int __init do_copy(void)
 {
 	if (byte_count >= body_len) {
+		struct timespec64 t[2] = { };
 		if (xwrite(wfile, victim, body_len, &wfile_pos) != body_len)
 			error("write error");
 
-		do_utime_path(&wfile->f_path, mtime);
+		t[0].tv_sec = mtime;
+		t[1].tv_sec = mtime;
+		vfs_utimes(&wfile->f_path, t);
+
 		fput(wfile);
 		if (csum_present && io_csum != hdr_csum)
 			error("bad data checksum");
