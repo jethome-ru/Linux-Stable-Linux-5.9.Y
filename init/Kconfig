@@ -1346,16 +1346,6 @@ config BOOT_CONFIG_EMBED_FILE
 	  This bootconfig will be used if there is no initrd or no other
 	  bootconfig in the initrd.
 
-config INITRAMFS_PRESERVE_MTIME
-	bool "Preserve cpio archive mtimes in initramfs"
-	default y
-	help
-	  Each entry in an initramfs cpio archive carries an mtime value. When
-	  enabled, extracted cpio items take this mtime, with directory mtime
-	  setting deferred until after creation of any child entries.
-
-	  If unsure, say Y.
-
 choice
 	prompt "Compiler optimization level"
 	default CC_OPTIMIZE_FOR_PERFORMANCE
