@@ -14,7 +14,14 @@
 
 	aliases {
 		ethernet0 = &rtl8189ftv;
+		serial1 = "/soc/serial@2500400";
+		serial3 = "/soc/serial@2500c00";
 	};
+	chosen {
+		stdout-path = "serial3:115200n8";
+		bootargs = "mem=128M cma=48M console=ttyS3,115200 earlyprintk=sunxi-uart,0x2500c00 rootfstype=squashfs rootwait";
+	};
+
 };
 
 &cpu0 {
