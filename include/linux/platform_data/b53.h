@@ -29,9 +29,6 @@ struct b53_platform_data {
 	u32 chip_id;
 	u16 enabled_ports;
 
-	/* allow to specify an ethX alias */
-	const char *alias;
-
 	/* only used by MMAP'd driver */
 	unsigned big_endian:1;
 	void __iomem *regs;
