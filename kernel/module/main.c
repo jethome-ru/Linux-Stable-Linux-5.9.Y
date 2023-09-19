@@ -2017,7 +2017,6 @@ static void module_augment_kernel_taints(struct module *mod, struct load_info *i
 				mod->name);
 		add_taint_module(mod, TAINT_OOT_MODULE, LOCKDEP_STILL_OK);
 	}
-#endif
 
 	check_modinfo_retpoline(mod, info);
 
@@ -2076,10 +2075,8 @@ static void module_augment_kernel_taints(struct module *mod, struct load_info *i
 
 static int check_modinfo(struct module *mod, struct load_info *info, int flags)
 {
-	int err;
-
-#ifndef CONFIG_MODULE_STRIPPED
 	const char *modmagic = get_modinfo(info, "vermagic");
+	int err;
 
 	if (flags & MODULE_INIT_IGNORE_VERMAGIC)
 		modmagic = NULL;
