@@ -222,7 +222,28 @@ retry:
 out:
 	put_page(page);
 }
- 
+
+static int __init mount_ubi_rootfs(void)
+{
+	int flags = MS_SILENT;
+	int err, tried = 0;
+
+	while (tried < 2) {
+		err = do_mount_root("ubi0:rootfs", "ubifs", flags, \
+					root_mount_data);
+		switch (err) {
+			case -EACCES:
+				flags |= MS_RDONLY;
+				tried++;
+				break;
+			default:
+				return err;
+		}
+	}
+
+	return -EINVAL;
+}
+
 #ifdef CONFIG_ROOT_NFS
 
 #define NFSROOT_TIMEOUT_MIN	5
@@ -376,6 +397,10 @@ void __init mount_root(char *root_device_name)
 			break;
 		fallthrough;
 	default:
+#ifdef CONFIG_MTD_ROOTFS_ROOT_DEV
+		if (!mount_ubi_rootfs())
+			return;
+#endif
 		mount_block_root(root_device_name);
 		break;
 	}
